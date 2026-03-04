@@ -41,6 +41,34 @@ class QiiiParserServiceTest {
         assertNull(result.get("custo_básico_global_5"));
     }
 
+    @Test
+    void shouldFindParentFiveWhenLabelIsInColumnC() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+
+            Sheet target = workbook.createSheet(TARGET_SHEET_NAME);
+
+            Row child = target.createRow(0);
+            child.createCell(2).setCellValue("5.1.1 Custo Basico de Materiais e outros");
+            child.createCell(8).setCellValue(15986845.90);
+
+            Row parent = target.createRow(1);
+            parent.createCell(2).setCellValue("5. Custo\u00A0Basico\u00A0Global da Edificacao");
+            parent.createCell(8).setCellValue(26644743.17);
+
+            workbook.write(output);
+            MockMultipartFile file = new MockMultipartFile(
+                    "file",
+                    "qiii.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    output.toByteArray()
+            );
+
+            Map<String, Object> result = service.parseQiii(file, new BigDecimal("3500.00"));
+            assertValueFromSheet(result, "custo_básico_global_5", new BigDecimal("26644743.17"));
+        }
+    }
+
     private void assertValueFromSheet(Map<String, Object> result, String key, BigDecimal expectedValue) {
         Object raw = result.get(key);
         assertNotNull(raw, "Esperava valor em " + key);

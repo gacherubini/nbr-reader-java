@@ -63,7 +63,7 @@ public class QiiiParserService {
             // Scan textual SEM avaliar fórmulas (evita crash do POI)
             String rowText = normalizeText(rowToText(row, formatter));
 
-            if (rowText.startsWith(startsWith) && rowText.contains(mustContain)) {
+            if (containsSectionLabel(rowText, startsWith) && rowText.contains(mustContain)) {
                 BigDecimal value = getRightmostNumber(row, formatter, evaluator);
                 if (value != null) {
                     return new FoundValue(
@@ -190,10 +190,20 @@ public class QiiiParserService {
         String normalized = Normalizer.normalize(s, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "");
 
+        // XLSX costuma trazer NBSP e separadores de célula; unifica para espaço.
+        normalized = normalized.replace('\u00A0', ' ').replace('|', ' ');
         normalized = normalized.toLowerCase().trim();
         normalized = normalized.replaceAll("\\s+", " ");
 
         return normalized;
+    }
+
+    private boolean containsSectionLabel(String text, String sectionLabel) {
+        if (text == null || text.isBlank() || sectionLabel == null || sectionLabel.isBlank()) return false;
+
+        String section = Pattern.quote(sectionLabel);
+        Pattern rootItemPattern = Pattern.compile("(^|\\s)" + section + "(?!\\d)");
+        return rootItemPattern.matcher(text).find();
     }
 
     private static class FoundValue {
