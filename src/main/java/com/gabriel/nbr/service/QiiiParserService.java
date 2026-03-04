@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 public class QiiiParserService {
 
     private static final Pattern MONEY_BR = Pattern.compile("(-?\\d{1,3}(?:\\.\\d{3})*,\\d{2})");
+    private static final String TARGET_SHEET_NAME = "NBR 12721 Q-III";
 
     public Map<String, Object> parseQiii(MultipartFile file, BigDecimal cub) throws IOException {
         try (InputStream inputStream = file.getInputStream();
@@ -33,28 +34,19 @@ public class QiiiParserService {
             result.put("subtotal_2_10", null);
             result.put("custo_básico_global_5", null);
 
-            for (Sheet sheet : workbook) {
-                if (result.get("subtotal_1_7") == null) {
-                    FoundValue subtotal7 = findValueInSheet(sheet, formatter, evaluator, "7.", "subtotal");
-                    if (subtotal7 != null) result.put("subtotal_1_7", subtotal7.toMap());
-                }
-
-                if (result.get("subtotal_2_10") == null) {
-                    FoundValue subtotal10 = findValueInSheet(sheet, formatter, evaluator, "10.", "subtotal");
-                    if (subtotal10 != null) result.put("subtotal_2_10", subtotal10.toMap());
-                }
-
-                if (result.get("custo_básico_global_5") == null) {
-                    FoundValue custo5 = findValueInSheet(sheet, formatter, evaluator, "5.", "custo basico global");
-                    if (custo5 != null) result.put("custo_básico_global_5", custo5.toMap());
-                }
-
-                if (result.get("subtotal_1_7") != null
-                        && result.get("subtotal_2_10") != null
-                        && result.get("custo_básico_global_5") != null) {
-                    break;
-                }
+            Sheet targetSheet = workbook.getSheet(TARGET_SHEET_NAME);
+            if (targetSheet == null) {
+                return result;
             }
+
+            FoundValue subtotal7 = findValueInSheet(targetSheet, formatter, evaluator, "7.", "subtotal");
+            if (subtotal7 != null) result.put("subtotal_1_7", subtotal7.toMap());
+
+            FoundValue subtotal10 = findValueInSheet(targetSheet, formatter, evaluator, "10.", "subtotal");
+            if (subtotal10 != null) result.put("subtotal_2_10", subtotal10.toMap());
+
+            FoundValue custo5 = findValueInSheet(targetSheet, formatter, evaluator, "5.", "custo basico global");
+            if (custo5 != null) result.put("custo_básico_global_5", custo5.toMap());
 
             return result;
         }
