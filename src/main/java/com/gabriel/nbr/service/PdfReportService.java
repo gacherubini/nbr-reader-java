@@ -52,11 +52,17 @@ public class PdfReportService {
                 drawTableHeader(content, bold, margin, tableTop, leftColWidth, rightColWidth, rowHeight);
 
                 float rowY = tableTop - rowHeight;
+                BigDecimal total = BigDecimal.ZERO;
                 for (Map.Entry<String, BigDecimal> entry : table.entrySet()) {
+                    BigDecimal value = entry.getValue() == null ? BigDecimal.ZERO : entry.getValue();
                     drawRow(content, regular, margin, rowY, leftColWidth, rightColWidth, rowHeight,
-                            entry.getKey(), money.format(entry.getValue()));
+                            entry.getKey(), money.format(value));
+                    total = total.add(value);
                     rowY -= rowHeight;
                 }
+
+                drawRow(content, bold, margin, rowY, leftColWidth, rightColWidth, rowHeight,
+                        "Total", money.format(total));
             }
 
             document.save(output);
