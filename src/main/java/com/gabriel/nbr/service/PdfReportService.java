@@ -1,5 +1,7 @@
 package com.gabriel.nbr.service;
 
+import com.gabriel.nbr.dto.cronograma.LinhaCronogramaResponse;
+import com.gabriel.nbr.dto.cronograma.MatrizCronogramaResponse;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -13,6 +15,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -61,6 +64,47 @@ public class PdfReportService {
         }
     }
 
+    public byte[] buildCronogramaPdf(String arquivo, BigDecimal cub, MatrizCronogramaResponse cronograma) throws IOException {
+        NumberFormat money = NumberFormat.getCurrencyInstance(PT_BR);
+
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+
+            PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+            PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+
+            float margin = 45;
+            float y = page.getMediaBox().getHeight() - margin;
+
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                y = writeLine(content, bold, 14, margin, y, "Cronograma Fisico-Financeiro");
+                y = writeLine(content, regular, 10, margin, y - 6, "Arquivo: " + safe(arquivo));
+                y = writeLine(content, regular, 10, margin, y, "CUB informado: " + money.format(cub));
+                y = writeLine(content, regular, 10, margin, y, "Data: " + LocalDate.now());
+
+                if (cronograma.cabecalho() != null && !cronograma.cabecalho().isEmpty()) {
+                    String inicio = cronograma.cabecalho().get(0);
+                    String fim = cronograma.cabecalho().get(cronograma.cabecalho().size() - 1);
+                    y = writeLine(content, regular, 10, margin, y, "Periodo: " + inicio + " ate " + fim);
+                }
+
+                y -= 12;
+                for (LinhaCronogramaResponse linha : cronograma.linhas()) {
+                    BigDecimal total = soma(linha.valores());
+                    y = writeLine(content, bold, 11, margin, y, linha.categoria() + " - Total: " + money.format(total));
+
+                    String valoresCompactados = compactarValores(cronograma.cabecalho(), linha.valores(), money);
+                    y = writeLine(content, regular, 9, margin + 10, y, valoresCompactados);
+                    y -= 6;
+                }
+            }
+
+            document.save(output);
+            return output.toByteArray();
+        }
+    }
+
     private float writeLine(PDPageContentStream content, PDType1Font font, int size, float x, float y, String text)
             throws IOException {
         content.beginText();
@@ -95,5 +139,31 @@ public class PdfReportService {
     private String safe(String s) {
         return (s == null || s.isBlank()) ? "(sem nome)" : s;
     }
-}
 
+    private BigDecimal soma(List<BigDecimal> valores) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (BigDecimal valor : valores) {
+            total = total.add(valor == null ? BigDecimal.ZERO : valor);
+        }
+        return total;
+    }
+
+    private String compactarValores(List<String> cabecalho, List<BigDecimal> valores, NumberFormat money) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < valores.size(); i++) {
+            BigDecimal valor = valores.get(i);
+            if (valor == null || valor.signum() == 0) {
+                continue;
+            }
+
+            if (!sb.isEmpty()) {
+                sb.append(" | ");
+            }
+
+            String mes = i < cabecalho.size() ? cabecalho.get(i) : "mes-" + (i + 1);
+            sb.append(mes).append(": ").append(money.format(valor));
+        }
+
+        return sb.isEmpty() ? "Sem desembolso no periodo." : sb.toString();
+    }
+}
